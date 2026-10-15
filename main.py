@@ -23,6 +23,7 @@ from image_red_teaming.scenario_generation import ScenarioGenerator, ScenarioMan
 from image_red_teaming.providers.fal import FalProvider
 from image_red_teaming.providers.leonardo import LeonardoProvider
 from image_red_teaming.providers.openai_gpt_image import OpenAIGPTImageProvider
+from image_red_teaming.providers.grok_imagine import GrokImagineProvider
 from image_red_teaming.providers.flux2_local import Flux2LocalProvider
 from image_red_teaming.exploration import ExplorationConfig, PERTURBATION_METHODS
 
@@ -84,6 +85,23 @@ def resolve_model_resources(model_config, headers=None, selection: str = "unifor
     return build_llm(model_config, headers=headers), model_config, None
 
 
+def _coerce_query_value(value: str) -> str | int | float:
+    """Turn numeric query-string values into int/float.
+
+    xAI's images API (among others) requires integer/float types for params
+    like `n` or a seed, but the query string only yields strings.
+    """
+    try:
+        return int(value)
+    except ValueError:
+        pass
+    try:
+        return float(value)
+    except ValueError:
+        pass
+    return value
+
+
 def build_t2i(name: str, output_dir: Path | None = None):
     if name.startswith("fal-ai/"):
         return FalProvider(model_id=name, output_dir=output_dir)
@@ -106,8 +124,24 @@ def build_t2i(name: str, output_dir: Path | None = None):
         if query:
             for k, vs in parse_qs(query, keep_blank_values=False).items():
                 if vs:
-                    default_params[k] = vs[0]
+                    default_params[k] = _coerce_query_value(vs[0])
         return OpenAIGPTImageProvider(
+            model_id=model_part or None,
+            output_dir=output_dir,
+            default_params=default_params,
+        )
+    if name == "grok-imagine":
+        return GrokImagineProvider(output_dir=output_dir)
+    if name.startswith("grok-imagine/"):
+        spec = name.split("/", 1)[1]
+        model_part, _, query = spec.partition("?")
+        from urllib.parse import parse_qs
+        default_params: dict = {}
+        if query:
+            for k, vs in parse_qs(query, keep_blank_values=False).items():
+                if vs:
+                    default_params[k] = _coerce_query_value(vs[0])
+        return GrokImagineProvider(
             model_id=model_part or None,
             output_dir=output_dir,
             default_params=default_params,

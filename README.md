@@ -70,6 +70,7 @@ Credentials are read from a `.env` file. You need only the ones your run touches
 - `OPENROUTER_API_KEY` — the attacker LLM and the judge
 - `OPENAI_API_KEY` — the DALL·E 3 and GPT-Image targets, and the local testbed's moderation
 - `FAL_KEY` — the Nano-Banana targets, served through fal.ai
+- `XAI_API_KEY` — the Grok Imagine targets, served through xAI's OpenAI-compatible API
 
 That is the whole setup: the configs reach every model over an API, so nothing needs to run
 locally unless you want it to.
@@ -192,11 +193,31 @@ keeping the `name` / `instructions` / `prompt_tag` fields. What ships in the fil
 generic placeholders standing in for the strategies we withheld; they run, but they will not
 reproduce the paper's phase-2 numbers.
 
+### Grok Imagine target (xAI)
+
+`grok-imagine/` is supported via a dedicated provider (`image_red_teaming/providers/grok_imagine.py`)
+and the `XAI_API_KEY` credential. It talks to xAI's OpenAI-compatible `/images/generations` endpoint
+(default `https://api.x.ai/v1`, overridable with `XAI_BASE_URL`). Model + params are given in the
+provider string; extra request params are parsed from the query string:
+
+```yaml
+t2i_provider: grok-imagine/grok-imagine-image-2.0?n=2
+```
+
+Unlike the pixel-`size` targets, xAI accepts `aspect_ratio` (e.g. `1:1`, `3:4`, `4:3`, `9:16`,
+`16:9`); a `size="1024x1024"` value is translated to the matching aspect ratio automatically. It
+returns hosted image URLs (plus `mime_type`) rather than base64, so the provider downloads each
+image. For a quick sanity check against a fresh key:
+
+```bash
+PYTHONPATH=. uv run python scripts/test_grok_imagine.py
+```
+
 ## Config reference
 
 | Field | Meaning |
 | --- | --- |
-| `t2i_provider` | target model, with URL params, e.g. `openai/dall-e-3?size=1024x1024&quality=standard`. Prefixes: `openai/`, `fal-ai/`, `leonardo/`, `flux2-local`, and `fal:<app id>` for fal apps outside the `fal-ai/` namespace |
+| `t2i_provider` | target model, with URL params, e.g. `openai/dall-e-3?size=1024x1024&quality=standard`. Prefixes: `openai/`, `fal-ai/`, `leonardo/`, `flux2-local`, `grok-imagine/`, and `fal:<app id>` for fal apps outside the `fal-ai/` namespace |
 | `examples_path` | seed scenarios with their criteria (phase 1) |
 | `criteria_path` | criteria to generate scenarios from (phase 2; used instead of `examples_path`) |
 | `prompts_path` | meta-prompt template used when mutating strategies |
